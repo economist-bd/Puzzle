@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>রিলাক্সিং পাজল গেম</title>
+    <!-- আধুনিক এবং সুন্দর ফন্টের জন্য গুগল ফন্ট ব্যবহার করা হয়েছে -->
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* বেসিক রিসেট এবং গ্লোবাল স্টাইল */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Hind Siliguri', sans-serif;
+            /* মোবাইল ডিভাইসে ট্যাপ করলে যে হাইলাইট হয় তা বন্ধ করার জন্য */
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        body {
+            background: linear-gradient(to bottom, #dbeafe, #eff6ff); /* ছবির মতো হালকা নীল ব্যাকগ্রাউন্ড */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden; /* স্ক্রলবার বন্ধ করার জন্য */
+        }
+
+        /* মূল গেম কন্টেইনার */
+        .game-container {
+            width: 100%;
+            max-width: 450px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        /* উপরের টেক্সট স্টাইল */
+        .header-text {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 700;
+            color: #1e293b;
+            line-height: 1.2;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+        }
+
+        /* পাজল বোর্ডের স্টাইল */
+        #puzzle-board {
+            width: 100%;
+            /* বোর্ডটিকে সবসময় চারকোনা (Square) রাখার জন্য */
+            aspect-ratio: 1 / 1; 
+            background-color: #cbd5e1;
+            border: 4px solid #334155;
+            border-radius: 8px;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        /* পাজলের প্রতিটি টুকরোর (Tile) স্টাইল */
+        .tile {
+            position: absolute;
+            /* 4x4 গ্রিড, তাই প্রতিটি টুকরো 25% জায়গা নিবে */
+            width: 25%; 
+            height: 25%;
+            /* আপনার গিটহাবের ছবি যুক্ত করা হলো (রিলেটিভ পাথ) */
+            background-image: url('image.jpg');
+            /* ছবিটিকে বোর্ডের 4 গুণ বড় করা হলো, যাতে প্রতিটি টুকরো ছবির একটি অংশ পায় */
+            background-size: 400% 400%; 
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            /* টুকরো সরানোর সময় স্মুথ এনিমেশন */
+            transition: transform 0.2s ease-in-out;
+            border-radius: 4px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+        }
+
+        /* ফাঁকা জায়গার স্টাইল */
+        .tile.empty {
+            opacity: 0;
+            pointer-events: none; /* ফাঁকা জায়গায় ক্লিক করা যাবে না */
+        }
+
+        /* নিচের ইন্সটল বাটনের স্টাইল (ছবির মতো) */
+        .install-btn {
+            background-color: white;
+            color: #2563eb;
+            font-size: 22px;
+            font-weight: 700;
+            padding: 12px 30px;
+            border: 2px solid #2563eb;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .install-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* গেম জেতার পর মেসেজ */
+        #win-message {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(34, 197, 94, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            z-index: 10;
+            width: 80%;
+        }
+
+        /* শাফেল বাটন */
+        .control-btn {
+            background-color: #334155;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <!-- ছবির মতো হুবহু টেক্সট -->
+        <div class="header-text">
+            Focused on the puzzles,<br>calm and relaxed.
+        </div>
+
+        <button class="control-btn" onclick="shuffleBoard()">পাজলটি আবার এলোমেলো করুন</button>
+
+        <!-- পাজল খেলার মূল জায়গা -->
+        <div id="puzzle-board">
+            <!-- জাভাস্ক্রিপ্ট দিয়ে এখানে পাজলের টুকরোগুলো তৈরি করা হবে -->
+            <div id="win-message">অভিনন্দন! আপনি পাজলটি মিলিয়েছেন! 🎉</div>
+        </div>
+
+        <!-- নিচের ইন্সটল বাটন (ছবির মতো) -->
+        <a href="#" class="install-btn" onclick="alert('এটি একটি ডেমো গেম! আপনি চাইলে এখানে আপনার ওয়েবসাইটের লিংক দিতে পারেন।')">
+            🔗 এখনই ইনস্টল করুন
+        </a>
+    </div>
+
+    <script>
+        // গেমের লজিক (শিক্ষার্থীদের বোঝানোর জন্য আদর্শ)
+        const boardElement = document.getElementById('puzzle-board');
+        const winMessage = document.getElementById('win-message');
+        const gridSize = 4; // 4x4 গ্রিড (মোট 16 টি ঘর)
+        const totalTiles = gridSize * gridSize;
+        
+        // বর্তমান বোর্ডের অবস্থা রাখার জন্য অ্যারে।
+        // 0 থেকে 14 পর্যন্ত হলো ছবির টুকরো, আর 15 হলো ফাঁকা জায়গা (Empty slot)
+        let boardState = [];
+
+        // গেম শুরু করার ফাংশন
+        function initGame() {
+            boardElement.innerHTML = '<div id="win-message">অভিনন্দন! আপনি পাজলটি মিলিয়েছেন! 🎉</div>';
+            boardState = [];
+            
+            // প্রথমে সাজানো অবস্থায় বোর্ড তৈরি করছি
+            for (let i = 0; i < totalTiles; i++) {
+                boardState.push(i);
+                createTileElement(i);
+            }
+            
+            // শুরুতেই পাজলটি এলোমেলো করে দেওয়া
+            shuffleBoard();
+        }
+
+        // HTML এ পাজলের টুকরো তৈরি করার ফাংশন
+        function createTileElement(id) {
+            const tile = document.createElement('div');
+            tile.classList.add('tile');
+            tile.id = `tile-${id}`;
+            
+            // শেষ নম্বরটি (15) হবে ফাঁকা জায়গা
+            if (id === totalTiles - 1) {
+                tile.classList.add('empty');
+            } else {
+                // ছবির কোন অংশটি এই টুকরোতে দেখাবে তা নির্ধারণ করা
+                // background-position এর মাধ্যমে ছবির অংশ কাটা হয়
+                const row = Math.floor(id / gridSize);
+                const col = id % gridSize;
+                tile.style.backgroundPosition = `${(col * 100) / (gridSize - 1)}% ${(row * 100) / (gridSize - 1)}%`;
+            }
+
+            // টুকরোতে ক্লিক করলে সরানোর ফাংশন কল হবে
+            tile.addEventListener('click', () => handleTileClick(id));
+            boardElement.appendChild(tile);
+        }
+
+        // টুকরোগুলোকে স্ক্রিনে সঠিক জায়গায় বসানোর ফাংশন
+        function renderBoard() {
+            boardState.forEach((tileId, currentIndex) => {
+                const tileElement = document.getElementById(`tile-${tileId}`);
+                if (tileElement) {
+                    // বর্তমান ইনডেক্স অনুযায়ী গ্রিডের কোথায় বসবে তার হিসাব (Top এবং Left পজিশন)
+                    const row = Math.floor(currentIndex / gridSize);
+                    const col = currentIndex % gridSize;
+                    // CSS Transform ব্যবহার করে জায়গা পরিবর্তন করা হচ্ছে (স্মুথ এনিমেশনের জন্য)
+                    tileElement.style.transform = `translate(${col * 100}%, ${row * 100}%)`;
+                }
+            });
+        }
+
+        // পাজল এলোমেলো করার ফাংশন
+        function shuffleBoard() {
+            winMessage.style.display = 'none';
+            // একটি সলভড পাজল থেকে র‍্যান্ডমলি অনেকবার সরিয়ে এলোমেলো করা হয়, 
+            // যাতে গেমটি সবসময় মেলানো সম্ভব হয় (Solvable থাকে)।
+            for (let i = 0; i < 300; i++) {
+                const emptyIndex = boardState.indexOf(totalTiles - 1);
+                const validMoves = getValidMoves(emptyIndex);
+                // যেকোনো একটি সম্ভাব্য মুভ বেছে নেওয়া
+                const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                
+                // টুকরো সোয়াপ (অদলবদল) করা
+                [boardState[emptyIndex], boardState[randomMove]] = [boardState[randomMove], boardState[emptyIndex]];
+            }
+            renderBoard();
+        }
+
+        // ফাঁকা জায়গার আশেপাশে কোন কোন টুকরো সরানো যাবে তার হিসাব
+        function getValidMoves(emptyIndex) {
+            const moves = [];
+            const row = Math.floor(emptyIndex / gridSize);
+            const col = emptyIndex % gridSize;
+
+            if (row > 0) moves.push(emptyIndex - gridSize); // উপরের টুকরো
+            if (row < gridSize - 1) moves.push(emptyIndex + gridSize); // নিচের টুকরো
+            if (col > 0) moves.push(emptyIndex - 1); // বামের টুকরো
+            if (col < gridSize - 1) moves.push(emptyIndex + 1); // ডানের টুকরো
+
+            return moves;
+        }
+
+        // ব্যবহারকারী যখন কোনো টুকরোতে ক্লিক করে
+        function handleTileClick(tileId) {
+            const clickedIndex = boardState.indexOf(tileId);
+            const emptyIndex = boardState.indexOf(totalTiles - 1); // 15 হলো ফাঁকা
+            const validMoves = getValidMoves(emptyIndex);
+
+            // যদি ক্লিক করা টুকরোটি ফাঁকা জায়গার আশেপাশে থাকে, তবেই সরবে
+            if (validMoves.includes(clickedIndex)) {
+                // Array এর ডাটা সোয়াপ (অদলবদল) করা
+                [boardState[emptyIndex], boardState[clickedIndex]] = [boardState[clickedIndex], boardState[emptyIndex]];
+                renderBoard();
+                checkWinCondition();
+            }
+        }
+
+        // গেম জিতেছে কিনা তা চেক করার ফাংশন
+        function checkWinCondition() {
+            let hasWon = true;
+            for (let i = 0; i < totalTiles; i++) {
+                // যদি সবগুলো টুকরো তাদের আসল ইনডেক্সে থাকে
+                if (boardState[i] !== i) {
+                    hasWon = false;
+                    break;
+                }
+            }
+
+            if (hasWon) {
+                // একটু দেরি করে মেসেজ দেখানো যাতে শেষের মুভমেন্টটা দেখা যায়
+                setTimeout(() => {
+                    winMessage.style.display = 'block';
+                }, 300);
+            }
+        }
+
+        // পেজ লোড হলে গেম শুরু হবে
+        window.onload = initGame;
+
+    </script>
+</body>
+</html>
+
+
