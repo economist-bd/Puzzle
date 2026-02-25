@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>রিলাক্সিং পাজল গেম</title>
+    <!-- PWA এর জন্য ডাইনামিক ম্যানিফেস্ট লিংক (জাভাস্ক্রিপ্ট দিয়ে তৈরি হবে) -->
+    <link id="manifest-link" rel="manifest" href="">
+    <meta name="theme-color" content="#2563eb">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* বেসিক রিসেট এবং গ্লোবাল স্টাইল */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Hind Siliguri', sans-serif;
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        body {
+            background: linear-gradient(to bottom, #dbeafe, #eff6ff);
+            /* মোবাইলে ঠিকমতো ফিট হওয়ার জন্য 100dvh (dynamic viewport height) ব্যবহার করা হয়েছে */
+            height: 100dvh; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden; 
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 450px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            height: 100%;
+            justify-content: center;
+        }
+
+        .header-text {
+            text-align: center;
+            font-size: clamp(20px, 5vw, 24px); /* স্ক্রিন অনুযায়ী সাইজ ঠিক হবে */
+            font-weight: 700;
+            color: #1e293b;
+            line-height: 1.2;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+        }
+
+        /* ছবি বাছাই করার কন্টেইনার */
+        .image-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 5px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .thumbnail {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            border: 3px solid transparent;
+            cursor: pointer;
+            background-size: cover;
+            background-position: center;
+            transition: transform 0.2s, border-color 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        /* সিলেক্ট করা ছবির স্টাইল */
+        .thumbnail.active {
+            border-color: #2563eb;
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+
+        #puzzle-board {
+            width: 100%;
+            max-width: 380px; /* মোবাইলে অতিরিক্ত বড় হওয়া রোধ করতে */
+            aspect-ratio: 1 / 1; 
+            background-color: #cbd5e1;
+            border: 4px solid #334155;
+            border-radius: 8px;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            overflow: hidden;
+            margin: 0 auto;
+        }
+
+        .tile {
+            position: absolute;
+            width: 25%; 
+            height: 25%;
+            background-size: 400% 400%; 
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out;
+            border-radius: 4px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+        }
+
+        .tile.empty {
+            opacity: 0;
+            pointer-events: none; 
+        }
+
+        .buttons-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .control-btn {
+            background-color: #334155;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: clamp(14px, 4vw, 16px);
+            cursor: pointer;
+            flex: 1;
+            transition: background-color 0.2s;
+        }
+
+        .control-btn:active {
+            background-color: #1e293b;
+        }
+
+        /* PWA ইনস্টল বাটন - শুরুতে লুকানো থাকবে */
+        #install-btn {
+            background-color: white;
+            color: #2563eb;
+            border: 2px solid #2563eb;
+            font-weight: 700;
+            display: none; /* ব্রাউজার সাপোর্ট করলে জাভাস্ক্রিপ্ট দিয়ে দেখানো হবে */
+        }
+
+        #win-message {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(34, 197, 94, 0.95);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            z-index: 10;
+            width: 85%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="header-text">
+            Focused on the puzzles,<br>calm and relaxed.
+        </div>
+
+        <!-- ৪টি ছবি বাছাই করার অপশন -->
+        <div class="image-selector" id="image-selector">
+            <!-- জাভাস্ক্রিপ্ট দিয়ে থাম্বনেইল তৈরি হবে -->
+        </div>
+
+        <div id="puzzle-board">
+            <div id="win-message">অভিনন্দন! আপনি পাজলটি মিলিয়েছেন! 🎉</div>
+        </div>
+
+        <div class="buttons-row">
+            <button class="control-btn" onclick="shuffleBoard()">🔄 এলোমেলো করুন</button>
+            <button class="control-btn" id="install-btn">📱 অ্যাপ ইনস্টল করুন</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. PWA সেটআপ (Single File PWA Magic) ---
+        // ম্যানিফেস্ট ডেটা তৈরি
+        const manifestData = {
+            "name": "রিলাক্সিং পাজল গেম",
+            "short_name": "পাজল",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#eff6ff",
+            "theme_color": "#2563eb",
+            "icons": [
+                {
+                    "src": "https://cdn-icons-png.flaticon.com/512/10543/10543102.png", // একটি ডেমো আইকন
+                    "sizes": "512x512",
+                    "type": "image/png"
+                },
+                {
+                    "src": "https://cdn-icons-png.flaticon.com/192/10543/10543102.png",
+                    "sizes": "192x192",
+                    "type": "image/png"
+                }
+            ]
+        };
+        // ম্যানিফেস্ট লিংক যুক্ত করা
+        const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/manifest+json' });
+        document.getElementById('manifest-link').href = URL.createObjectURL(manifestBlob);
+
+        // অফলাইন সাপোর্টের জন্য সার্ভিস ওয়ার্কার তৈরি (Blob ব্যবহার করে)
+        const swCode = `
+            self.addEventListener('install', (e) => {
+                console.log('[Service Worker] Install');
+                self.skipWaiting();
+            });
+            self.addEventListener('fetch', (e) => {
+                e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+            });
+        `;
+        const swBlob = new Blob([swCode], { type: 'application/javascript' });
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register(URL.createObjectURL(swBlob))
+                .then(() => console.log('Service Worker Registered for PWA!'))
+                .catch(err => console.log('SW Error:', err));
+        }
+
+        // অ্যাপ ইনস্টল প্রম্পট লজিক
+        let deferredPrompt;
+        const installBtn = document.getElementById('install-btn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.style.display = 'block'; // বাটনটি দেখান
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    installBtn.style.display = 'none';
+                }
+                deferredPrompt = null;
+            }
+        });
+        // --- PWA সেটআপ শেষ ---
+
+
+        // --- 2. গেমের লজিক ---
+        // আপনি চাইলে এখানে আপনার গিটহাবের image1.jpg, image2.jpg ইত্যাদি লিংক দিতে পারেন
+        const gameImages = [
+            'https://images.unsplash.com/photo-1605806616949-1e87b487cb2a?q=80&w=800&auto=format&fit=crop', // ক্যাসেল/ফ্যান্টাসি
+            'https://images.unsplash.com/photo-1506744626753-1fa44df14dd3?q=80&w=800&auto=format&fit=crop', // পাহাড়
+            'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?q=80&w=800&auto=format&fit=crop', // ল্যান্ডস্কেপ
+            'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=800&auto=format&fit=crop'  // লেক
+        ];
+
+        let currentImageIndex = 0;
+        const boardElement = document.getElementById('puzzle-board');
+        const winMessage = document.getElementById('win-message');
+        const selectorContainer = document.getElementById('image-selector');
+        const gridSize = 4;
+        const totalTiles = gridSize * gridSize;
+        let boardState = [];
+
+        // থাম্বনেইল তৈরি করার ফাংশন
+        function setupImageSelector() {
+            gameImages.forEach((imgSrc, index) => {
+                const thumb = document.createElement('div');
+                thumb.classList.add('thumbnail');
+                if (index === 0) thumb.classList.add('active');
+                thumb.style.backgroundImage = `url('${imgSrc}')`;
+                thumb.onclick = () => changeImage(index);
+                selectorContainer.appendChild(thumb);
+            });
+        }
+
+        // ছবি পরিবর্তন করার ফাংশন
+        function changeImage(index) {
+            currentImageIndex = index;
+            // অ্যাকটিভ থাম্বনেইল স্টাইল আপডেট
+            document.querySelectorAll('.thumbnail').forEach((thumb, i) => {
+                thumb.classList.toggle('active', i === index);
+            });
+            // গেম রিস্টার্ট
+            initGame();
+        }
+
+        function initGame() {
+            boardElement.innerHTML = '<div id="win-message">অভিনন্দন! আপনি পাজলটি মিলিয়েছেন! 🎉</div>';
+            boardState = [];
+            for (let i = 0; i < totalTiles; i++) {
+                boardState.push(i);
+                createTileElement(i);
+            }
+            shuffleBoard();
+        }
+
+        function createTileElement(id) {
+            const tile = document.createElement('div');
+            tile.classList.add('tile');
+            tile.id = `tile-${id}`;
+            
+            if (id === totalTiles - 1) {
+                tile.classList.add('empty');
+            } else {
+                const row = Math.floor(id / gridSize);
+                const col = id % gridSize;
+                // বর্তমান সিলেক্ট করা ছবিটি সেট করা হচ্ছে
+                tile.style.backgroundImage = `url('${gameImages[currentImageIndex]}')`;
+                tile.style.backgroundPosition = `${(col * 100) / (gridSize - 1)}% ${(row * 100) / (gridSize - 1)}%`;
+            }
+
+            tile.addEventListener('click', () => handleTileClick(id));
+            boardElement.appendChild(tile);
+        }
+
+        function renderBoard() {
+            boardState.forEach((tileId, currentIndex) => {
+                const tileElement = document.getElementById(`tile-${tileId}`);
+                if (tileElement) {
+                    const row = Math.floor(currentIndex / gridSize);
+                    const col = currentIndex % gridSize;
+                    tileElement.style.transform = `translate(${col * 100}%, ${row * 100}%)`;
+                }
+            });
+        }
+
+        function shuffleBoard() {
+            document.getElementById('win-message').style.display = 'none';
+            // ৩০০ বার পাজল মুভ করে এলোমেলো করা হচ্ছে, যাতে গেমটি সলভ করা যায়
+            for (let i = 0; i < 300; i++) {
+                const emptyIndex = boardState.indexOf(totalTiles - 1);
+                const validMoves = getValidMoves(emptyIndex);
+                const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                [boardState[emptyIndex], boardState[randomMove]] = [boardState[randomMove], boardState[emptyIndex]];
+            }
+            renderBoard();
+        }
+
+        function getValidMoves(emptyIndex) {
+            const moves = [];
+            const row = Math.floor(emptyIndex / gridSize);
+            const col = emptyIndex % gridSize;
+
+            if (row > 0) moves.push(emptyIndex - gridSize);
+            if (row < gridSize - 1) moves.push(emptyIndex + gridSize);
+            if (col > 0) moves.push(emptyIndex - 1);
+            if (col < gridSize - 1) moves.push(emptyIndex + 1);
+
+            return moves;
+        }
+
+        function handleTileClick(tileId) {
+            const clickedIndex = boardState.indexOf(tileId);
+            const emptyIndex = boardState.indexOf(totalTiles - 1);
+            const validMoves = getValidMoves(emptyIndex);
+
+            if (validMoves.includes(clickedIndex)) {
+                [boardState[emptyIndex], boardState[clickedIndex]] = [boardState[clickedIndex], boardState[emptyIndex]];
+                renderBoard();
+                checkWinCondition();
+            }
+        }
+
+        function checkWinCondition() {
+            let hasWon = true;
+            for (let i = 0; i < totalTiles; i++) {
+                if (boardState[i] !== i) {
+                    hasWon = false;
+                    break;
+                }
+            }
+            if (hasWon) {
+                setTimeout(() => {
+                    document.getElementById('win-message').style.display = 'block';
+                }, 300);
+            }
+        }
+
+        // পেজ লোড হলে গেম ও ছবি বাছাই করার অপশন চালু হবে
+        window.onload = () => {
+            setupImageSelector();
+            initGame();
+        };
+
+    </script>
+</body>
+</html>
+
+
